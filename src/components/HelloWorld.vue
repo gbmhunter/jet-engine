@@ -1,10 +1,16 @@
 <template>
-  <div class="app">
-    <h2>JetEngine</h2>
-    <div style="width: 400px; height: 400px;">
-        <canvas id="myChart" width="400" height="400"></canvas>
+  <div class="app" style="display: flex; flex-direction: column; justify-content: center; align-items: center;">
+    <h1>Jet Engine PID Control</h1>
+
+    <h2>Jet Engine Model</h2>
+    <div style="width: 800px; height: 400px;">
+        <canvas id="myChart" width="800" height="400"></canvas>
     </div>
-    <vue-slider ref="slider" v-model="fuelFlow_lPmin" style="width:400px;"></vue-slider>
+    <p>Fuel Flow Rate (L/min)</p>
+    <vue-slider ref="slider" v-model="fuelFlow_lPmin" :min=0 :max=1 :interval=0.01 style="width:400px;"></vue-slider>
+
+    <h2>PID Control</h2>
+
   </div>
 </template>
 
@@ -23,8 +29,8 @@ export default {
   data () {
     return {
       msg: 'Welcome to Your Vue.js App',
-      jetEngineModel: new JetEngineModel(1.0, -1.0),
-      fuelFlow_lPmin: 1.0,
+      jetEngineModel: new JetEngineModel(10000.0, -1.0, 1000),
+      fuelFlow_lPmin: 0.0,
       updateRate_s: 0.1,
       duration_s: 0.0,
       chartConfig: {
@@ -41,7 +47,20 @@ export default {
         },
         options: {
             scales: {
+              xAxes: [{
+                    scaleLabel: {
+                      display: true,
+                      labelString: "Time (s)"                      
+                    },
+                    ticks: {
+                        beginAtZero:true
+                    }
+                }],
                 yAxes: [{
+                    scaleLabel: {
+                      display: true,
+                      labelString: "Rotational Velocity (rpm)"                      
+                    },
                     ticks: {
                         beginAtZero:true
                     }
@@ -49,7 +68,8 @@ export default {
             }
         }
       },
-      chart: null
+      chart: null,
+      maxNumDataPoints: 100,
     }
   },
   methods: {
@@ -64,14 +84,24 @@ export default {
         let rotVel_rpm = (rotVel_radPs/(2*Math.PI)) * 60
 
         this.chartConfig.data.labels.push(this.duration_s.toFixed(2))
+
+        // Limit number of data points
+        if(this.chartConfig.data.labels.length > this.maxNumDataPoints) {
+          this.chartConfig.data.labels.shift()
+        }
+
         this.chartConfig.data.datasets[0].data.push(rotVel_rpm)
+
+        // Limit number of data points
+        if(this.chartConfig.data.datasets[0].data.length > this.maxNumDataPoints) {
+          this.chartConfig.data.datasets[0].data.shift()
+        }
+
         this.chart.update()
     }
   },
   mounted() {
     var ctx = document.getElementById("myChart");
-    ctx.width = 400
-    ctx.height = 400
     this.chart = new Chart(ctx, this.chartConfig);
 
     window.setInterval(() => {
