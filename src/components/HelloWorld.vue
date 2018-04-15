@@ -20,7 +20,7 @@
       ref="slider"
       v-model="fuelFlow_lPmin"
       :min=0 :max=1 :interval=0.01
-      :disabled="selectedRunMode === 'CONTROL_RPM_PID'"
+      :disabled="selectedRunMode === 'RUN_MODE_PID_MANUAL_RPM_CONTROD'"
       style="width:400px;" />
 
     <button v-on:click="startStopJetEngineModel">{{ !jetEngineModelRunning ? 'Start' : 'Stop' }}</button>
@@ -28,6 +28,37 @@
     <p>Velocity Set-Point (rpm)</p>
     <vue-slider ref="slider" v-model="rotVelSetPoint_rpm" :min=0 :max=100000 :interval=1000 style="width:400px;"></vue-slider>
 
+    <p>PID Constants</p>
+
+    
+    <table class="sliders"> 
+      <tbody>
+        <tr> 
+          <td>Constant</td>
+          <td>Min. Limit</td>
+          <td>Max. Limit</td>
+          <td>Value</td>
+        </tr>
+        <tr> 
+          <td>P</td>
+          <td><input class="pid-limit" /></td>
+          <td><input class="pid-limit" /></td>
+          <td style="width: 200px;"><vue-slider ref="slider" direction="horizontal"></vue-slider></td>
+        </tr>
+        <tr> 
+          <td>I</td>
+          <td><input class="pid-limit" /></td>
+          <td><input class="pid-limit" /></td>
+          <td style="width: 200px;"><vue-slider ref="slider" direction="horizontal"></vue-slider></td>
+        </tr>
+        <tr> 
+          <td>D</td>
+          <td><input class="pid-limit" /></td>
+          <td><input class="pid-limit" /></td>
+          <td style="width: 200px;"><vue-slider ref="slider" direction="horizontal"></vue-slider></td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </template>
 
@@ -53,11 +84,13 @@ export default {
       updateRate_s: 0.1,
       duration_s: 0.0,
 
+      // Enumeration of run modes. Used to populate select input.
       runModes: [
-        { text: 'Control Fuel Rate', value: 'CONTROL_FUEL_RATE' },
-        { text: 'Control RPM (PID)', value: 'CONTROL_RPM_PID' }
+        { text: 'Control Fuel Rate (no PID)', value: 'RUN_MODE_CONTROL_FUEL_RATE' },
+        { text: 'Manual RPM Control (PID)', value: 'RUN_MODE_PID_MANUAL_RPM_CONTROL' },
+        { text: 'Auto RPM Step Changes (PID)', value: 'RUN_MODE_PID_AUTO_RPM_STEP_CHANGES' }
       ],
-      selectedRunMode: 'CONTROL_RPM_PID',
+      selectedRunMode: 'RUN_MODE_PID_MANUAL_RPM_CONTROL', // Selected run mode (selected by user)
 
       chartConfig: {
         type: 'line',
@@ -96,6 +129,7 @@ export default {
       rotVelSetPoint_rpm: 0.0,      
       maxNumDataPoints: 100,
       pid: new Pid(0.0006, 0.0006, 0.0),
+      pidPConstant: 0.0
     }
   },
   methods: {
@@ -133,7 +167,7 @@ export default {
     },
     tick () {
       // console.log('tick() called.')
-      if(this.selectedRunMode === 'CONTROL_RPM_PID') {
+      if(this.selectedRunMode === 'RUN_MODE_PID_MANUAL_RPM_CONTROL') {
         let rotVel_radPs = this.jetEngineModel.getRotVel_radPs()
 
         console.log('this.rotVelSetPoint_rpm = ' + this.rotVelSetPoint_rpm)
@@ -148,7 +182,7 @@ export default {
       this.duration_s += this.tickRate_s    
     },
     // This updates the UI. Called by window.setInterval()
-    update () {
+    update () {<td><input class="pid-limit" /></td>
       let rotVel_radPs = this.jetEngineModel.getRotVel_radPs()
       let rotVel_rpm = (rotVel_radPs/(2*Math.PI)) * 60
 
@@ -167,7 +201,7 @@ export default {
       }
 
       // If in PID run mode, update set point also
-      if(this.selectedRunMode === 'CONTROL_RPM_PID') {
+      if(this.selectedRunMode === 'RUN_MODE_PID_MANUAL_RPM_CONTROL') {
         this.chartConfig.data.datasets[1].data.push({x: this.duration_s, y: this.rotVelSetPoint_rpm})
       }
 
@@ -182,7 +216,7 @@ export default {
   watch: {
     selectedRunMode: function(val) {
       console.log('selectedRunMode changed.')
-      if(val === 'CONTROL_RPM_PID') {
+      if(val === 'RUN_MODE_PID_MANUAL_RPM_CONTROL') {
         this.addSetPointLine()
       }
     }
@@ -191,7 +225,7 @@ export default {
     var ctx = document.getElementById("myChart");
     this.chart = new Chart(ctx, this.chartConfig);
 
-    if(this.selectedRunMode === 'CONTROL_RPM_PID') {
+    if(this.selectedRunMode === 'RUN_MODE_PID_MANUAL_RPM_CONTROL') {
       this.addSetPointLine()
     }
 
@@ -202,7 +236,8 @@ export default {
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
-h1, h2 {
+h1,
+h2 {
   font-weight: normal;
 }
 ul {
@@ -215,5 +250,14 @@ li {
 }
 a {
   color: #42b983;
+}
+
+/* Table with sliders. Make row height large enough that slider value fits into it */
+.sliders tr {
+  height: 50px;
+}
+
+.sliders input {
+  width: 50px;
 }
 </style>
