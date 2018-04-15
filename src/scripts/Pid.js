@@ -17,6 +17,13 @@ export class Pid {
         this.setPoint = value
     }
 
+    setConstants(pConstant, iConstant, dConstant) {
+        console.log('setConstants() called. pConstant = ' + pConstant + ', iConstant = ' + iConstant + ', dConstant = ' + dConstant)
+        this.pConstant = pConstant
+        this.iConstant = iConstant
+        this.dConstant = dConstant
+    }
+
     run(currentValue, deltaTime_s) {  
         
         console.log('Pid.run() called. currentValue = ' + currentValue + ', deltaTime_s = ' + deltaTime_s)

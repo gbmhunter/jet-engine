@@ -33,29 +33,40 @@
     
     <table class="sliders"> 
       <tbody>
-        <tr> 
+        <tr>
           <td>Constant</td>
           <td>Min. Limit</td>
           <td>Max. Limit</td>
           <td>Value</td>
         </tr>
-        <tr> 
+        <tr>
           <td>P</td>
-          <td><input class="pid-limit" /></td>
-          <td><input class="pid-limit" /></td>
-          <td style="width: 200px;"><vue-slider ref="slider" direction="horizontal"></vue-slider></td>
+          <td><input v-model="pidConstants.p.min" class="pid-limit"/></td>
+          <td><input v-model="pidConstants.p.max" class="pid-limit"/></td>
+          <td style="width: 200px;">
+            <vue-slider ref="slider" v-model="pidConstants.p.value"
+            :min="Number(pidConstants.p.min)" :max="Number(pidConstants.p.max)" 
+            :interval="(Number(pidConstants.p.max) - Number(pidConstants.p.min)) / 100.0"/></td>
         </tr>
-        <tr> 
+        <tr>
           <td>I</td>
-          <td><input class="pid-limit" /></td>
-          <td><input class="pid-limit" /></td>
-          <td style="width: 200px;"><vue-slider ref="slider" direction="horizontal"></vue-slider></td>
+          <td><input v-model="pidConstants.i.min" class="pid-limit"/></td>
+          <td><input v-model="pidConstants.i.max" class="pid-limit"/></td>
+          <td style="width: 200px;">
+            <vue-slider ref="slider" v-model="pidConstants.i.value"
+            :min="Number(pidConstants.i.min)" :max="Number(pidConstants.i.max)" 
+            :interval="(Number(pidConstants.i.max) - Number(pidConstants.i.min)) / 100.0"/>
+          </td>
         </tr>
-        <tr> 
+        <tr>
           <td>D</td>
-          <td><input class="pid-limit" /></td>
-          <td><input class="pid-limit" /></td>
-          <td style="width: 200px;"><vue-slider ref="slider" direction="horizontal"></vue-slider></td>
+          <td><input v-model="pidConstants.d.min" class="pid-limit"/></td>
+          <td><input v-model="pidConstants.d.max" class="pid-limit"/></td>
+          <td style="width: 200px;">
+            <vue-slider ref="slider" v-model="pidConstants.d.value"
+            :min="Number(pidConstants.d.min)" :max="Number(pidConstants.d.max)" 
+            :interval="(Number(pidConstants.d.max) - Number(pidConstants.d.min)) / 100.0"/>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -128,8 +139,25 @@ export default {
 
       rotVelSetPoint_rpm: 0.0,      
       maxNumDataPoints: 100,
-      pid: new Pid(0.0006, 0.0006, 0.0),
-      pidPConstant: 0.0
+      pid: new Pid(0.0006, 0.0006, 0.0), // PID constants get overriden by values set from sliders
+      pidConstants: {
+        p: {
+          min: 0.0,
+          max: 0.001,
+          value: 0.0006
+        },        
+        i: {
+          min: 0.0,
+          max: 0.001,
+          value: 0.0006
+        }, 
+        d: {
+          min: 0.0,
+          max: 0.001,
+          value: 0.0
+        }, 
+      }
+      
     }
   },
   methods: {
@@ -146,7 +174,6 @@ export default {
       this.chart.update()
     },
     startStopJetEngineModel () {
-
       if(!this.jetEngineModelRunning) {
         this.modelTickTimer = window.setInterval(() => {
             this.tick()
@@ -161,9 +188,7 @@ export default {
         clearInterval(this.modelTickTimer)
         clearInterval(this.modelUpdateTimer)
         this.jetEngineModelRunning = false
-    }
-
-      
+      }      
     },
     tick () {
       // console.log('tick() called.')
@@ -182,7 +207,7 @@ export default {
       this.duration_s += this.tickRate_s    
     },
     // This updates the UI. Called by window.setInterval()
-    update () {<td><input class="pid-limit" /></td>
+    update () {
       let rotVel_radPs = this.jetEngineModel.getRotVel_radPs()
       let rotVel_rpm = (rotVel_radPs/(2*Math.PI)) * 60
 
@@ -211,7 +236,12 @@ export default {
       }
 
       this.chart.update()
+    },
+
+    updatePidConstants () {
+      this.pid.setConstants(this.pidConstants.p.value, this.pidConstants.i.value, this.pidConstants.d.value)
     }
+
   },
   watch: {
     selectedRunMode: function(val) {
@@ -219,6 +249,13 @@ export default {
       if(val === 'RUN_MODE_PID_MANUAL_RPM_CONTROL') {
         this.addSetPointLine()
       }
+    },
+    pidConstants: {
+      handler(val) {
+        console.log('pidConstants changed.')
+        this.updatePidConstants()
+      },
+      deep: true
     }
   },
   mounted() {
@@ -228,6 +265,8 @@ export default {
     if(this.selectedRunMode === 'RUN_MODE_PID_MANUAL_RPM_CONTROL') {
       this.addSetPointLine()
     }
+
+    this.updatePidConstants()
 
   }
 }
