@@ -10,6 +10,11 @@ export class Pid {
         this.setPoint = 0.0
         this.iValue = 0.0
         this.previousError = 0.0
+
+        // Output limiting
+        this.enableOutputLimiting = false
+        this.outputLimMin = 0.0
+        this.outputLimMax = 0.0
     }
 
     setSetPoint(value) {
@@ -22,6 +27,12 @@ export class Pid {
         this.pConstant = pConstant
         this.iConstant = iConstant
         this.dConstant = dConstant
+    }
+
+    setOutputLimits(min, max) {
+        this.outputLimMin = min
+        this.outputLimMax = max
+        this.enableOutputLimiting = true
     }
 
     run(currentValue, deltaTime_s) {  
@@ -58,6 +69,15 @@ export class Pid {
         console.log('output = ' + output)
 
         this.previousError = error
+
+        // Limit output if output limiting is enabled
+        if(this.enableOutputLimiting) {
+            if(output > this.outputLimMax) {
+                output = this.outputLimMax
+            } else if(output < this.outputLimMin) {
+                output = this.outputLimMin
+            }
+        }
 
         return output
 

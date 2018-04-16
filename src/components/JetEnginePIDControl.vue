@@ -7,6 +7,12 @@
     </div>
 
     <div id="below-chart" style="display: flex;">
+
+      <div id="jet-engine-parameters">
+          Fuel Flow Rate Limits (mL/min):<br>
+          min <input v-model="fuelFlowRateMin_mlPmin" v-on:change="fuelFlowRateLimitsChanged"/> max <input v-model="fuelFlowRateMax_mlPmin" v-on:change="fuelFlowRateLimitsChanged"/>
+      </div>
+
       <div id="controls">
         <p>Run Mode</p>
         <select v-model="selectedRunMode" style="width: 300px; height: 50px;">
@@ -15,16 +21,22 @@
           </option>
         </select>
 
-        <p>Fuel Flow Rate (L/min)</p>
-        <vue-slider 
-          ref="slider"
-          v-model="fuelFlow_lPmin"
-          :min=0 :max=1 :interval=0.01
-          :disabled="selectedRunMode === 'RUN_MODE_PID_MANUAL_RPM_CONTROL' || selectedRunMode === 'RUN_MODE_PID_AUTO_RPM_STEP_CHANGES'"
-          style="width:400px;" />        
+        <p>Fuel Flow Rate (mL/min)</p>
+        <div>
+            <div style="height: 20px;"/>
+            <vue-slider 
+                ref="slider"
+                v-model="fuelFlow_mlPmin"
+                :min="Number(fuelFlowRateMin_mlPmin)" :max="Number(fuelFlowRateMax_mlPmin)" :interval="(Number(fuelFlowRateMax_mlPmin) - Number(fuelFlowRateMin_mlPmin)) / 100.0"
+                :disabled="selectedRunMode === 'RUN_MODE_PID_MANUAL_RPM_CONTROL' || selectedRunMode === 'RUN_MODE_PID_AUTO_RPM_STEP_CHANGES'"
+                style="width:400px;" />
+        </div>   
 
         <p>Velocity Set-Point (rpm)</p>
-        <vue-slider ref="slider" v-model="rotVelSetPoint_rpm" :min=0 :max=100000 :interval=1000 style="width:400px;"></vue-slider>
+        <div>
+            <div style="height: 20px;"/>
+            <vue-slider ref="slider" v-model="rotVelSetPoint_rpm" :min=0 :max=100000 :interval=1000 style="width:400px;"></vue-slider>
+        </div>
       </div>
 
       <div id="pid-constants">
@@ -92,7 +104,11 @@ export default {
     return {
       msg: "Welcome to Your Vue.js App",
       jetEngineModel: new JetEngineModel(10000.0, -1.0, 10000),
-      fuelFlow_lPmin: 0.0,
+
+      fuelFlow_mlPmin: 0.0,
+      fuelFlowRateMin_mlPmin: 0.0,
+      fuelFlowRateMax_mlPmin: 1000.0,
+
       tickRate_s: 0.05,
       updateRate_s: 0.1,
       duration_s: 0.0,
@@ -189,6 +205,10 @@ export default {
       });
       this.chart.update();
     },
+    fuelFlowRateLimitsChanged () {
+      console.log('Fuel flow rate limits changed.')
+      this.pid.setOutputLimits(Number(this.fuelFlowRateMin_mlPmin)/1000.0, Number(this.fuelFlowRateMax_mlPmin)/1000.0)
+    },
     performAutoSetPointChange() {
       if (this.rotVelSetPoint_rpm === 0.0) {
         this.rotVelSetPoint_rpm = 60000.0;
@@ -237,10 +257,10 @@ export default {
         let rotVelSetPoint_radPs = this.rotVelSetPoint_rpm / 60.0 * 2 * Math.PI;
 
         this.pid.setSetPoint(rotVelSetPoint_radPs);
-        this.fuelFlow_lPmin = this.pid.run(rotVel_radPs, this.tickRate_s);
+        this.fuelFlow_mlPmin = this.pid.run(rotVel_radPs, this.tickRate_s)*1000.0;
       }
 
-      this.jetEngineModel.update(this.fuelFlow_lPmin, this.tickRate_s);
+      this.jetEngineModel.update(this.fuelFlow_mlPmin/1000.0, this.tickRate_s);
 
       this.duration_s += this.tickRate_s;
     },
@@ -322,6 +342,7 @@ export default {
     this.selectedRunMode = 'RUN_MODE_PID_AUTO_RPM_STEP_CHANGES'
 
     this.updatePidConstants();
+    this.fuelFlowRateLimitsChanged();
   }
 };
 /* eslint-enable */
