@@ -10,7 +10,7 @@
 
       <div id="jet-engine-parameters">
           Fuel Flow Rate Limits (mL/min):<br>
-          min <input v-model="fuelFlowRateMin_mlPmin" v-on:change="fuelFlowRateLimitsChanged"/> max <input v-model="fuelFlowRateMax_mlPmin" v-on:change="fuelFlowRateLimitsChanged"/>
+          min <input v-model="fuelFlowRateMin_mlPmin" v-on:change="fuelFlowRateLimitsChanged" style="width: 100px;"/> max <input v-model="fuelFlowRateMax_mlPmin" v-on:change="fuelFlowRateLimitsChanged" style="width: 100px;"/>
       </div>
 
       <div id="controls">
@@ -80,6 +80,16 @@
             </tr>
           </tbody>
         </table>
+
+        <!-- INTEGRAL LIMITING SETTINGS -->
+        Integral Limiting Mode
+        <select v-model="selIntegralLimitingMode" @change="setIntegralLimitingMode" style="width: 300px; height: 50px;">
+            <option v-for="option in integralLimitModes" v-bind:value="option" v-bind:key="option">
+            {{ String(option) }}
+          </option>
+        </select>
+        <br>
+        Min: <input v-model="integralLimitingConstantMin" @change="setIntegralLimitingMode" :disabled="areIntegralLimitingConstantsDisabled"/>, Max: <input v-model="integralLimitingConstantMax" @change="setIntegralLimitingMode" :disabled="areIntegralLimitingConstantsDisabled"/>
       </div>
     </div>
 
@@ -93,7 +103,7 @@ import Chart from "chart.js";
 import vueSlider from "vue-slider-component";
 
 import { JetEngineModel } from "../scripts/JetEngineModel.js";
-import { Pid } from "../scripts/Pid";
+import { Pid, IntegralLimitModes } from "../scripts/Pid";
 
 export default {
   name: "HelloWorld",
@@ -189,8 +199,23 @@ export default {
           max: 0.001,
           value: 0.0
         }
-      }
+      },
+      integralLimitModes: [],
+      selIntegralLimitingMode: null,
+      integralLimitingConstantMin: -1.0,
+      integralLimitingConstantMax: 1.0,
     };
+  },
+  computed: {
+        areIntegralLimitingConstantsDisabled () {
+            console.log('areIntegralLimitingConstantsDisabled() called. this.selIntegralLimitingMode = ' + this.selIntegralLimitingMode + ', this.integralLimitModes = ')
+            console.log(this.integralLimitModes)
+            if(this.selIntegralLimitingMode === IntegralLimitModes.CONSTANT_LIMITED) {
+                return false
+            } else {
+                return true
+            }
+        }
   },
   methods: {
     addSetPointLine() {
@@ -205,9 +230,12 @@ export default {
       });
       this.chart.update();
     },
-    fuelFlowRateLimitsChanged () {
-      console.log('Fuel flow rate limits changed.')
-      this.pid.setOutputLimits(Number(this.fuelFlowRateMin_mlPmin)/1000.0, Number(this.fuelFlowRateMax_mlPmin)/1000.0)
+    fuelFlowRateLimitsChanged() {
+      console.log("Fuel flow rate limits changed.");
+      this.pid.setOutputLimits(
+        Number(this.fuelFlowRateMin_mlPmin) / 1000.0,
+        Number(this.fuelFlowRateMax_mlPmin) / 1000.0
+      );
     },
     performAutoSetPointChange() {
       if (this.rotVelSetPoint_rpm === 0.0) {
@@ -216,10 +244,30 @@ export default {
         this.rotVelSetPoint_rpm = 0.0;
       }
     },
+    setIntegralLimitingMode () {
+        console.log("selIntegralLimitingMode changed.")
+        if(this.selIntegralLimitingMode === IntegralLimitModes.NONE) {
+            this.pid.setIntegralLimit({
+                mode: IntegralLimitModes.NONE
+            });
+        } else if(this.selIntegralLimitingMode === IntegralLimitModes.CONSTANT_LIMITED) {
+            this.pid.setIntegralLimit({
+                mode: IntegralLimitModes.CONSTANT_LIMITED,
+                min: Number(this.integralLimitingConstantMin),
+                max: Number(this.integralLimitingConstantMax)
+            });
+        } else if(this.selIntegralLimitingMode === IntegralLimitModes.OUTPUT_LIMITED) {
+            this.pid.setIntegralLimit({
+                mode: IntegralLimitModes.OUTPUT_LIMITED
+            });
+        } else {
+            throw new Error("Integral limiting mode unrecognized.")
+        }
+    },
     startStopSimulation() {
       if (!this.simulationRunning) {
         // START
-        console.log('Starting simulation...')
+        console.log("Starting simulation...");
 
         this.modelTickTimer = window.setInterval(() => {
           this.tick();
@@ -229,16 +277,16 @@ export default {
           this.update();
         }, this.updateRate_s * 1000.0);
 
-        if (this.selectedRunMode === "RUN_MODE_PID_AUTO_RPM_STEP_CHANGES") {          
+        if (this.selectedRunMode === "RUN_MODE_PID_AUTO_RPM_STEP_CHANGES") {
           this.autoStepChangeTimer = window.setInterval(() => {
             this.performAutoSetPointChange();
-            }, 4000.0);
+          }, 4000.0);
         }
 
         this.simulationRunning = true;
       } else {
         // STOP
-        console.log('Stopping simulation...')
+        console.log("Stopping simulation...");
         clearInterval(this.modelTickTimer);
         clearInterval(this.modelUpdateTimer);
         clearInterval(this.autoStepChangeTimer);
@@ -257,10 +305,14 @@ export default {
         let rotVelSetPoint_radPs = this.rotVelSetPoint_rpm / 60.0 * 2 * Math.PI;
 
         this.pid.setSetPoint(rotVelSetPoint_radPs);
-        this.fuelFlow_mlPmin = this.pid.run(rotVel_radPs, this.tickRate_s)*1000.0;
+        this.fuelFlow_mlPmin =
+          this.pid.run(rotVel_radPs, this.tickRate_s) * 1000.0;
       }
 
-      this.jetEngineModel.update(this.fuelFlow_mlPmin/1000.0, this.tickRate_s);
+      this.jetEngineModel.update(
+        this.fuelFlow_mlPmin / 1000.0,
+        this.tickRate_s
+      );
 
       this.duration_s += this.tickRate_s;
     },
@@ -321,9 +373,9 @@ export default {
     selectedRunMode: function(val) {
       console.log("selectedRunMode changed.");
       if (val === "RUN_MODE_PID_MANUAL_RPM_CONTROL") {
-        this.addSetPointLine()
+        this.addSetPointLine();
       } else if (val === "RUN_MODE_PID_AUTO_RPM_STEP_CHANGES") {
-        this.addSetPointLine()
+        this.addSetPointLine();
       }
     },
     pidConstants: {
@@ -339,10 +391,21 @@ export default {
     this.chart = new Chart(ctx, this.chartConfig);
 
     // Set the run mode to auto by default. This should trigger watch
-    this.selectedRunMode = 'RUN_MODE_PID_AUTO_RPM_STEP_CHANGES'
+    this.selectedRunMode = "RUN_MODE_PID_AUTO_RPM_STEP_CHANGES";
 
     this.updatePidConstants();
     this.fuelFlowRateLimitsChanged();
+
+    // Populate integral limit modes select box
+    let self = this
+    Object.keys(IntegralLimitModes).forEach(function (key) {
+        let obj = IntegralLimitModes[key];        
+        self.integralLimitModes.push(obj)        
+    });
+
+    // Set default integral limiting mode
+    this.selIntegralLimitingMode = IntegralLimitModes.OUTPUT_LIMITED
+
   }
 };
 /* eslint-enable */
