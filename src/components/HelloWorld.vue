@@ -2,8 +2,6 @@
   <div class="app" style="display: flex; flex-direction: column; justify-content: center; align-items: center;">
     <h1>Jet Engine PID Control</h1>
 
-    <h2>Jet Engine Model</h2>
-
     <div style="width: 800px; height: 400px;">
         <canvas id="myChart" width="800" height="400"></canvas>
     </div>
@@ -11,7 +9,7 @@
     <div id="below-chart" style="display: flex;">
       <div id="controls">
         <p>Run Mode</p>
-        <select v-model="selectedRunMode">
+        <select v-model="selectedRunMode" style="width: 300px; height: 50px;">
           <option v-for="option in runModes" v-bind:value="option.value">
             {{ option.text }}
           </option>
@@ -22,10 +20,8 @@
           ref="slider"
           v-model="fuelFlow_lPmin"
           :min=0 :max=1 :interval=0.01
-          :disabled="selectedRunMode === 'RUN_MODE_PID_MANUAL_RPM_CONTROD'"
-          style="width:400px;" />
-
-        <button v-on:click="startStopJetEngineModel">{{ !jetEngineModelRunning ? 'Start' : 'Stop' }}</button>
+          :disabled="selectedRunMode === 'RUN_MODE_PID_MANUAL_RPM_CONTROL' || selectedRunMode === 'RUN_MODE_PID_AUTO_RPM_STEP_CHANGES'"
+          style="width:400px;" />        
 
         <p>Velocity Set-Point (rpm)</p>
         <vue-slider ref="slider" v-model="rotVelSetPoint_rpm" :min=0 :max=100000 :interval=1000 style="width:400px;"></vue-slider>
@@ -74,6 +70,8 @@
         </table>
       </div>
     </div>
+
+    <button v-on:click="startStopSimulation" style="width: 100px; height: 50px;">{{ !simulationRunning ? 'Start' : 'Stop' }}</button>
   </div>
 </template>
 
@@ -152,7 +150,7 @@ export default {
         }
       },
       chart: null,
-      jetEngineModelRunning: false,
+      simulationRunning: false,
       modelTickTimer: null,
       modelUpdateTimer: null,
 
@@ -198,8 +196,11 @@ export default {
         this.rotVelSetPoint_rpm = 0.0;
       }
     },
-    startStopJetEngineModel() {
-      if (!this.jetEngineModelRunning) {
+    startStopSimulation() {
+      if (!this.simulationRunning) {
+        // START
+        console.log('Starting simulation...')
+
         this.modelTickTimer = window.setInterval(() => {
           this.tick();
         }, this.tickRate_s * 1000.0);
@@ -208,11 +209,20 @@ export default {
           this.update();
         }, this.updateRate_s * 1000.0);
 
-        this.jetEngineModelRunning = true;
+        if (this.selectedRunMode === "RUN_MODE_PID_AUTO_RPM_STEP_CHANGES") {          
+          this.autoStepChangeTimer = window.setInterval(() => {
+            this.performAutoSetPointChange();
+            }, 4000.0);
+        }
+
+        this.simulationRunning = true;
       } else {
+        // STOP
+        console.log('Stopping simulation...')
         clearInterval(this.modelTickTimer);
         clearInterval(this.modelUpdateTimer);
-        this.jetEngineModelRunning = false;
+        clearInterval(this.autoStepChangeTimer);
+        this.simulationRunning = false;
       }
     },
     tick() {
@@ -291,11 +301,9 @@ export default {
     selectedRunMode: function(val) {
       console.log("selectedRunMode changed.");
       if (val === "RUN_MODE_PID_MANUAL_RPM_CONTROL") {
-        this.addSetPointLine();
+        this.addSetPointLine()
       } else if (val === "RUN_MODE_PID_AUTO_RPM_STEP_CHANGES") {
-        this.autoStepChangeTimer = window.setInterval(() => {
-          this.performAutoSetPointChange();
-        }, 4000.0);
+        this.addSetPointLine()
       }
     },
     pidConstants: {
@@ -310,9 +318,8 @@ export default {
     var ctx = document.getElementById("myChart");
     this.chart = new Chart(ctx, this.chartConfig);
 
-    if (this.selectedRunMode === "RUN_MODE_PID_MANUAL_RPM_CONTROL") {
-      this.addSetPointLine();
-    }
+    // Set the run mode to auto by default. This should trigger watch
+    this.selectedRunMode = 'RUN_MODE_PID_AUTO_RPM_STEP_CHANGES'
 
     this.updatePidConstants();
   }
